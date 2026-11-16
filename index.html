@@ -132,6 +132,19 @@ nav.tabs button.on{color:var(--accent);font-weight:600}
 .del{border:0;background:transparent;color:var(--muted);width:32px;height:32px;border-radius:8px;font-size:18px}
 .add{margin-top:10px;border:1px dashed var(--line);background:transparent;border-radius:9px;padding:9px;width:100%;color:var(--accent);font-weight:500}
 .hint{font-size:12px;color:var(--muted);margin:8px 0 0;line-height:1.5}
+.viewbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.seg2{display:inline-grid;grid-template-columns:1fr 1fr;width:auto}
+.seg2 button{padding:6px 14px;font-size:13px}
+.cal{padding:10px 8px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.cal-dow{text-align:center;font-size:11px;color:var(--muted);padding:2px 0 6px}
+.sun{color:var(--bad)!important} .sat{color:var(--inc)!important}
+.cal-cell{border:1px solid transparent;background:transparent;border-radius:8px;min-height:62px;padding:4px 1px;display:flex;flex-direction:column;align-items:center;gap:1px;overflow:hidden}
+.cal-cell:active{background:var(--bg)}
+.cal-cell.today .cal-d{background:var(--accent);color:var(--surface)!important;border-radius:50%;width:22px;height:22px;display:grid;place-items:center}
+.cal-cell.sel{border-color:var(--accent);background:var(--accent-soft)}
+.cal-d{font-size:13px;font-weight:500;line-height:22px}
+.cal-a{font-size:9.5px;line-height:1.25;letter-spacing:-.3px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 140px);transform:translateX(-50%);background:var(--ink);color:var(--surface);padding:10px 16px;border-radius:999px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:20;white-space:nowrap}
 .toast.show{opacity:1}
 </style>
@@ -192,7 +205,7 @@ const DEFAULTS = {
 };
 const now = new Date();
 const S = {db:null, settings:null, settingsVer:false, txs:[], y:now.getFullYear(), m:now.getMonth()+1,
-  tab:"list", filter:"전체", loaded:false, editing:null, form:null};
+  tab:"list", view:"list", selDay:now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0")+"-"+String(now.getDate()).padStart(2,"0"), filter:"전체", loaded:false, editing:null, form:null};
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const won = n => (Math.round(n)||0).toLocaleString("ko-KR");
@@ -230,26 +243,10 @@ function render(){
   main.innerHTML = html;
 }
 
-function renderList(){
-  const list = monthTx(S.y,S.m);
-  const s = sums(list);
-  const left = s.수입-s.지출-s.저축;
-  let h = `<section class="card"><div class="totals">
-    <div><div class="lab">수입</div><div class="val num c-inc">${won(s.수입)}</div></div>
-    <div><div class="lab">지출</div><div class="val num">${won(s.지출)}</div></div>
-    <div><div class="lab">저축</div><div class="val num c-sav">${won(s.저축)}</div></div>
-    <div><div class="lab">저축률</div><div class="val num">${s.수입? Math.round((s.저축+left)/s.수입*1000)/10+"%":"-"}</div></div>
-    <div class="big"><span class="lab">남은 돈 (수입−지출−저축)</span><span class="val num ${left<0?"c-bad":""}">${won(left)}원</span></div>
-  </div></section>`;
-  h += `<div class="filters">${["전체","지출","수입","저축"].map(f=>`<button class="chip ${S.filter===f?"on":""}" data-filter="${f}">${f}</button>`).join("")}</div>`;
-  const shown = list.filter(t=>S.filter==="전체"||t.type===S.filter)
-    .sort((a,b)=> a.date<b.date?1:a.date>b.date?-1:(b.createdAt||0)-(a.createdAt||0));
-  if(!shown.length){
-    h += `<div class="empty">${S.loaded? "이 달에 적은 내역이 없어요.<br>+ 버튼으로 추가하세요." : "불러오는 중…"}</div>`;
-    return h;
-  }
+function dayGroups(list){
+  let h = "";
   const groups = {};
-  shown.forEach(t=>{ (groups[t.date]=groups[t.date]||[]).push(t); });
+  list.forEach(t=>{ (groups[t.date]=groups[t.date]||[]).push(t); });
   Object.keys(groups).forEach(d=>{
     const dt = new Date(d+"T00:00:00");
     const g = groups[d], out = g.filter(t=>t.type==="지출").reduce((a,t)=>a+(+t.amount||0),0);
@@ -266,6 +263,57 @@ function renderList(){
     h += `</div></div>`;
   });
   return h;
+}
+const shortWon = n => n>=1000000 ? Math.round(n/10000).toLocaleString("ko-KR")+"만" : n>=100000 ? (Math.round(n/1000)/10)+"만" : won(n);
+const sortTx = l => l.sort((a,b)=> a.date<b.date?1:a.date>b.date?-1:(b.createdAt||0)-(a.createdAt||0));
+
+function renderCal(list){
+  const first = new Date(S.y, S.m-1, 1), days = new Date(S.y, S.m, 0).getDate();
+  const per = {};
+  list.forEach(t=>{ const p=(per[t.date]=per[t.date]||{수입:0,지출:0,저축:0}); p[t.type]=(p[t.type]||0)+(+t.amount||0); });
+  const today = todayStr();
+  let h = `<section class="card cal"><div class="cal-grid">${DOW.map((d,i)=>`<div class="cal-dow ${i===0?"sun":i===6?"sat":""}">${d}</div>`).join("")}`;
+  for(let i=0;i<first.getDay();i++) h += `<div></div>`;
+  for(let d=1; d<=days; d++){
+    const key = ymKey(S.y,S.m)+"-"+pad(d), p = per[key], dow=(first.getDay()+d-1)%7;
+    h += `<button class="cal-cell ${key===today?"today":""} ${key===S.selDay?"sel":""}" data-day="${key}" aria-label="${S.m}월 ${d}일">
+      <span class="cal-d ${dow===0?"sun":dow===6?"sat":""}">${d}</span>
+      ${p&&p.지출?`<span class="cal-a num">−${shortWon(p.지출)}</span>`:""}
+      ${p&&p.수입?`<span class="cal-a num c-inc">+${shortWon(p.수입)}</span>`:""}
+      ${p&&p.저축?`<span class="cal-a num c-sav">${shortWon(p.저축)}</span>`:""}
+    </button>`;
+  }
+  h += `</div></section>`;
+  if(S.selDay && S.selDay.slice(0,7)===ymKey(S.y,S.m)){
+    const dayList = sortTx(list.filter(t=>t.date===S.selDay));
+    h += dayList.length ? dayGroups(dayList) : `<div class="empty">이 날 적은 내역이 없어요.</div>`;
+  }else{
+    h += `<div class="empty" style="padding:12px 0">날짜를 누르면 그날 내역이 보여요.</div>`;
+  }
+  return h;
+}
+
+function renderList(){
+  const list = monthTx(S.y,S.m);
+  const s = sums(list);
+  const left = s.수입-s.지출-s.저축;
+  let h = `<section class="card"><div class="totals">
+    <div><div class="lab">수입</div><div class="val num c-inc">${won(s.수입)}</div></div>
+    <div><div class="lab">지출</div><div class="val num">${won(s.지출)}</div></div>
+    <div><div class="lab">저축</div><div class="val num c-sav">${won(s.저축)}</div></div>
+    <div><div class="lab">저축률</div><div class="val num">${s.수입? Math.round((s.저축+left)/s.수입*1000)/10+"%":"-"}</div></div>
+    <div class="big"><span class="lab">남은 돈 (수입−지출−저축)</span><span class="val num ${left<0?"c-bad":""}">${won(left)}원</span></div>
+  </div></section>`;
+  h += `<div class="viewbar"><div class="seg seg2">${[["list","목록"],["cal","달력"]].map(([v,l])=>`<button data-view="${v}" class="${S.view===v?"on":""}">${l}</button>`).join("")}</div>`;
+  if(S.view!=="cal") h += `<div class="filters">${["전체","지출","수입","저축"].map(f=>`<button class="chip ${S.filter===f?"on":""}" data-filter="${f}">${f}</button>`).join("")}</div>`;
+  h += `</div>`;
+  if(S.view==="cal") return h + renderCal(list);
+  const shown = sortTx(list.filter(t=>S.filter==="전체"||t.type===S.filter));
+  if(!shown.length){
+    h += `<div class="empty">${S.loaded? "이 달에 적은 내역이 없어요.<br>+ 버튼으로 추가하세요." : "불러오는 중…"}</div>`;
+    return h;
+  }
+  return h + dayGroups(shown);
 }
 
 function renderSum(){
@@ -373,7 +421,7 @@ function renderSet(){
 function openSheet(tx){
   S.editing = tx ? tx.id : null;
   const lastPay = (S.txs.slice().sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))[0]||{}).pay || "체크카드";
-  const defDate = (S.y===now.getFullYear() && S.m===now.getMonth()+1) ? todayStr() : ymKey(S.y,S.m)+"-01";
+  const defDate = (S.view==="cal" && S.selDay && S.selDay.slice(0,7)===ymKey(S.y,S.m)) ? S.selDay : (S.y===now.getFullYear() && S.m===now.getMonth()+1) ? todayStr() : ymKey(S.y,S.m)+"-01";
   S.form = tx ? {...tx} : {type: S.filter!=="전체"?S.filter:"지출", amount:"", cat:"", date:defDate, memo:"", pay:lastPay, note:""};
   $("sheetTitle").textContent = tx ? "내역 수정" : "내역 추가";
   $("fDel").hidden = !tx;
@@ -490,6 +538,8 @@ $("main").addEventListener("input", e=>{
 $("main").addEventListener("click", async e=>{
   const t = e.target.closest("button"); if(!t) return;
   if(t.dataset.filter){ S.filter=t.dataset.filter; render(); return; }
+  if(t.dataset.view){ S.view=t.dataset.view; render(); return; }
+  if(t.dataset.day){ S.selDay=t.dataset.day; render(); return; }
   if(t.dataset.edit){ const tx=S.txs.find(x=>x.id===t.dataset.edit); if(tx) openSheet(tx); return; }
   if(t.dataset.addset){
     const key=t.dataset.addset, c=clone(cfg());

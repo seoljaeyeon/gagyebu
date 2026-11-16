@@ -127,9 +127,9 @@ nav.tabs button.on{color:var(--accent);font-weight:600}
 .err{color:var(--bad);font-size:13px;min-height:1em}
 /* settings */
 .set-list{display:flex;flex-direction:column;gap:8px}
-.set-item{display:flex;gap:8px;align-items:center}
+.set-item{display:flex;gap:6px;align-items:center}
 .set-item input{flex:1;min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:9px;padding:9px 10px}
-.set-item input.money{flex:none;width:112px;text-align:right;font-variant-numeric:tabular-nums}
+.set-item input.money{flex:none;width:92px;text-align:right;font-variant-numeric:tabular-nums}
 .del{border:0;background:transparent;color:var(--muted);width:32px;height:32px;border-radius:8px;font-size:18px}
 .add{margin-top:10px;border:1px dashed var(--line);background:transparent;border-radius:9px;padding:9px;width:100%;color:var(--accent);font-weight:500}
 .hint{font-size:12px;color:var(--muted);margin:8px 0 0;line-height:1.5}
@@ -146,6 +146,17 @@ nav.tabs button.on{color:var(--accent);font-weight:600}
 .cal-cell.sel{border-color:var(--accent);background:var(--accent-soft)}
 .cal-d{font-size:13px;font-weight:500;line-height:22px}
 .cal-a{font-size:clamp(7.5px,2.3vw,12px);line-height:1.3;letter-spacing:-.45px;white-space:nowrap;max-width:100%}
+.set-item .mv{display:flex;flex-direction:column;flex:none}
+.set-item .mv button{border:0;background:transparent;color:var(--muted);font-size:9px;width:22px;height:17px;padding:0;line-height:1}
+.set-item .mv button:disabled{opacity:.25}
+.set-item.confirm{background:var(--bad-soft);border-radius:9px;padding:8px 10px}
+.cmsg{flex:1;font-size:13px;color:var(--ink)} .cmsg small{color:var(--muted)}
+.mini{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 12px;font-size:13px;font-weight:500}
+.mini.danger{background:var(--bad);border-color:var(--bad);color:#fff}
+.mini.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.add-bar{display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)}
+.add-bar input{flex:1;min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:9px;padding:9px 10px}
+.add-bar input.money{flex:none;width:96px;text-align:right}
 .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 140px);transform:translateX(-50%);background:var(--ink);color:var(--surface);padding:10px 16px;border-radius:999px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:20;white-space:nowrap}
 .toast.show{opacity:1}
 </style>
@@ -241,7 +252,13 @@ function render(){
   if(S.tab==="list") html += renderList();
   else if(S.tab==="sum") html += renderSum();
   else html += renderSet();
+  // 다시 그릴 때 입력 중이던 칸의 값과 커서를 유지
+  const keep = {}; main.querySelectorAll("input[id]").forEach(el=>{ if(el.type!=="file") keep[el.id]=el.value; });
+  const act = document.activeElement && main.contains(document.activeElement) && document.activeElement.id ? document.activeElement.id : null;
   main.innerHTML = html;
+  Object.keys(keep).forEach(id=>{ const el=$(id); if(el && (id.startsWith("new")) ) el.value=keep[id]; });
+  const fid = S.refocus || act; S.refocus = null;
+  if(fid){ const el=$(fid); if(el){ el.focus({preventScroll:true}); } }
 }
 
 function dayGroups(list){
@@ -399,16 +416,26 @@ function niceStep(x){ const p=Math.pow(10,Math.floor(Math.log10(x))); const f=x/
 
 function renderSet(){
   const c = cfg();
-  const simple = (key,title,hint) => `<section class="card"><h2>${title}</h2><div class="set-list">${
-    c[key].map((n,i)=>`<div class="set-item"><input value="${esc(n)}" data-set="${key}" data-i="${i}" aria-label="${title} ${i+1}"><button class="del" data-del="${key}" data-i="${i}" aria-label="삭제">✕</button></div>`).join("")
-  }</div><button class="add" data-addset="${key}">+ 추가</button>${hint?`<p class="hint">${hint}</p>`:""}</section>`;
+  const usage = (key,name) => key==="pay" ? S.txs.filter(t=>t.pay===name).length : S.txs.filter(t=>t.type===typeOfKey[key] && t.cat===name).length;
+  const row = (key,i,name,extra) => {
+    const len = key==="expense"? c.expense.length : c[key].length;
+    if(S.confirmDel===key+":"+i){
+      const n = usage(key,name);
+      return `<div class="set-item confirm"><span class="cmsg"><b>${esc(name)}</b> 삭제할까요?${n?`<br><small>이미 적은 내역 ${n}건은 그대로 남아요</small>`:""}</span><button class="mini danger" data-delyes="${key}" data-i="${i}">삭제</button><button class="mini" data-delno="1">취소</button></div>`;
+    }
+    return `<div class="set-item"><div class="mv"><button data-mv="${key}" data-i="${i}" data-d="-1" aria-label="위로" ${i===0?"disabled":""}>▲</button><button data-mv="${key}" data-i="${i}" data-d="1" aria-label="아래로" ${i===len-1?"disabled":""}>▼</button></div><input value="${esc(name)}" data-set="${key}" data-i="${i}" aria-label="이름">${extra||""}<button class="del" data-del="${key}" data-i="${i}" aria-label="${esc(name)} 삭제">✕</button></div>`;
+  };
+  const addBar = (key, ph) => `<div class="add-bar"><input id="new-${key}" placeholder="${ph}" enterkeyhint="done">${key==="expense"?`<input class="money" id="newb-expense" inputmode="numeric" placeholder="예산" enterkeyhint="done">`:""}<button class="mini primary" data-addset="${key}">추가</button></div>`;
+  const simple = (key,title,ph) => `<section class="card"><h2>${title}</h2><div class="set-list">${
+    c[key].map((n,i)=>row(key,i,n)).join("")
+  }</div>${addBar(key,ph)}</section>`;
   let h = `<section class="card"><h2>지출 항목 · 월 예산(원)</h2><div class="set-list">${
-    c.expense.map((e,i)=>`<div class="set-item"><input value="${esc(e.name)}" data-set="expense" data-i="${i}" aria-label="지출 항목 ${i+1}"><input class="money" inputmode="numeric" value="${won(e.budget)}" data-budget="${i}" aria-label="${esc(e.name)} 예산"><button class="del" data-del="expense" data-i="${i}" aria-label="삭제">✕</button></div>`).join("")
-  }</div><button class="add" data-addset="expense">+ 추가</button><p class="hint">이름을 바꾸면 이미 적은 내역의 항목 이름도 같이 바뀌어요.</p></section>`;
+    c.expense.map((e,i)=>row("expense",i,e.name,`<input class="money" inputmode="numeric" value="${won(e.budget)}" data-budget="${i}" aria-label="${esc(e.name)} 예산">`)).join("")
+  }</div>${addBar("expense","새 지출 항목")}<p class="hint">이름을 바꾸면 이미 적은 내역의 항목 이름도 같이 바뀌어요. ▲▼로 순서를 바꾸면 입력 화면 항목 순서도 바뀌어요.</p></section>`;
   h += `<section class="card"><h2>월 저축 목표(원)</h2><div class="set-item"><input class="money" style="width:100%" inputmode="numeric" id="saveTarget" value="${won(c.saveTarget)}"></div></section>`;
-  h += simple("saving","저축 항목");
-  h += simple("income","수입 항목");
-  h += simple("pay","결제수단");
+  h += simple("saving","저축 항목","새 저축 항목");
+  h += simple("income","수입 항목","새 수입 항목");
+  h += simple("pay","결제수단","새 결제수단");
   h += `<section class="card"><h2>백업 · 내보내기</h2>
     <button class="add" style="margin-top:0" id="exportBtn">엑셀(CSV)로 내보내기</button>
     <button class="add" id="backupBtn">전체 백업 파일 저장</button>
@@ -531,9 +558,13 @@ $("main").addEventListener("change", async e=>{
     const c=clone(cfg()); c.saveTarget = parseMoney(el.value); saveSettings(c);
   }
 });
+$("main").addEventListener("keydown", e=>{
+  const el=e.target; if(e.key!=="Enter" || !el.id || !el.id.startsWith("new")) return;
+  e.preventDefault(); const key=el.id.replace(/^newb?-/,""); const b=document.querySelector(`button[data-addset="${key}"]`); b&&b.click();
+});
 $("main").addEventListener("input", e=>{
   const el=e.target;
-  if(el.dataset.budget!==undefined || el.id==="saveTarget"){ const d=el.value.replace(/[^0-9]/g,""); el.value = d?Number(d).toLocaleString("ko-KR"):""; }
+  if(el.dataset.budget!==undefined || el.id==="saveTarget" || el.id==="newb-expense"){ const d=el.value.replace(/[^0-9]/g,""); el.value = d?Number(d).toLocaleString("ko-KR"):""; }
 });
 
 $("main").addEventListener("click", async e=>{
@@ -544,19 +575,26 @@ $("main").addEventListener("click", async e=>{
   if(t.dataset.edit){ const tx=S.txs.find(x=>x.id===t.dataset.edit); if(tx) openSheet(tx); return; }
   if(t.dataset.addset){
     const key=t.dataset.addset, c=clone(cfg());
-    const base = key==="pay"?"새 결제수단":"새 항목"; let n=base, k=2;
+    const inp=$("new-"+key), name=(inp&&inp.value||"").trim();
+    if(!name){ toast("이름을 입력하세요"); inp&&inp.focus(); return; }
     const names = key==="expense"? c.expense.map(x=>x.name):c[key];
-    while(names.includes(n)) n = base+" "+(k++);
-    if(key==="expense") c.expense.push({name:n,budget:0}); else c[key].push(n);
+    if(names.includes(name)){ toast("이미 있는 이름이에요"); inp.focus(); return; }
+    if(key==="expense") c.expense.push({name, budget:parseMoney(($("newb-expense")||{}).value||"")}); else c[key].push(name);
+    inp.value=""; if($("newb-expense")) $("newb-expense").value="";
+    S.refocus = "new-"+key;
     await saveSettings(c);
-    const inputs = document.querySelectorAll(`input[data-set="${key}"]`); const last=inputs[inputs.length-1];
-    if(last){ last.focus(); last.select(); }
     return;
   }
-  if(t.dataset.del){
-    const key=t.dataset.del, i=+t.dataset.i, c=clone(cfg());
-    if(t.dataset.armed!=="1"){ t.dataset.armed="1"; t.textContent="?"; t.style.color="var(--bad)"; setTimeout(()=>{ if(t.isConnected){ t.dataset.armed=""; t.textContent="✕"; t.style.color=""; } },2500); return; }
-    c[key].splice(i,1); saveSettings(c); return;
+  if(t.dataset.del){ S.confirmDel = t.dataset.del+":"+t.dataset.i; render(); return; }
+  if(t.dataset.delno){ S.confirmDel = null; render(); return; }
+  if(t.dataset.delyes){
+    const key=t.dataset.delyes, i=+t.dataset.i, c=clone(cfg());
+    S.confirmDel = null; c[key].splice(i,1); saveSettings(c); return;
+  }
+  if(t.dataset.mv){
+    const key=t.dataset.mv, i=+t.dataset.i, j=i+(+t.dataset.d), c=clone(cfg()), arr=c[key];
+    if(j<0||j>=arr.length) return;
+    [arr[i],arr[j]]=[arr[j],arr[i]]; saveSettings(c); return;
   }
   if(t.id==="exportBtn") exportCsv();
   if(t.id==="backupBtn") exportJson();
@@ -621,7 +659,7 @@ $("main").addEventListener("change", async e=>{
 /* ---------- nav ---------- */
 $("prev").onclick = ()=>{ if(--S.m<1){S.m=12;S.y--;} render(); };
 $("next").onclick = ()=>{ if(++S.m>12){S.m=1;S.y++;} render(); };
-document.querySelectorAll("nav.tabs button").forEach(b=>b.onclick=()=>{ S.tab=b.dataset.tab; render(); $("main").scrollTop=0; });
+document.querySelectorAll("nav.tabs button").forEach(b=>b.onclick=()=>{ S.tab=b.dataset.tab; S.confirmDel=null; render(); $("main").scrollTop=0; });
 $("fab").onclick = ()=>openSheet(null);
 
 /* ---------- local store (이 기기에만 저장) ---------- */

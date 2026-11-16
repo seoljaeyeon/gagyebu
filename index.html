@@ -748,8 +748,8 @@ $("sheet").addEventListener("submit", async e=>{
   const wantRepeat = !S.editing && $("fRepeat").checked, wantFav = !S.editing && $("fFav").checked;
   $("fSave").disabled = true;
   try{
-    if(S.editing) await S.txCol.doc(S.editing).set(body);
-    else await S.txCol.add(body);
+    if(S.editing) await dbSet(S.txCol.doc(S.editing), body);
+    else await dbSet(S.txCol.doc(Date.now().toString(36)+Math.random().toString(36).slice(2,8)), body);
     if(wantRepeat || wantFav){
       const c2 = clone(cfg());
       if(wantRepeat){ (c2.recurring = c2.recurring||[]).push({id:Date.now().toString(36), day:+date.slice(8), type:body.type, cat:body.cat, memo:body.memo, amount, pay:body.pay, toPay:body.toPay, note:body.note, last: date.slice(0,7)}); }
@@ -767,14 +767,33 @@ let delArmed = false;
 $("fDel").addEventListener("click", async ()=>{
   if(!delArmed){ delArmed=true; $("fDel").textContent="한 번 더 누르면 삭제"; setTimeout(()=>{delArmed=false; $("fDel").textContent="삭제";},2500); return; }
   delArmed=false; $("fDel").textContent="삭제";
-  try{ await S.txCol.doc(S.editing).delete(); closeSheet(); toast("삭제했어요"); if((cfg().assets||[]).some(x=>x.link)) setTimeout(()=>saveAssets(clone(cfg().assets)), 300); }
+  try{ await dbDel(S.txCol.doc(S.editing)); closeSheet(); toast("삭제했어요"); if((cfg().assets||[]).some(x=>x.link)) setTimeout(()=>saveAssets(clone(cfg().assets)), 300); }
   catch(err){ $("fErr").textContent = errMsg(err); }
 });
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+// 저장소 쓰기: 일시적인 거절(횟수 제한·연결 문제)이면 잠깐 쉬었다가 다시 시도
+async function dbSet(ref, data){
+  let last;
+  for(let i=0;i<4;i++){
+    try{ return await ref.set(data); }
+    catch(e){ last=e; if(e && (e.code==="resource_exhausted" || e.code==="unavailable")){ await sleep(1500*(i+1)); continue; } throw e; }
+  }
+  throw last;
+}
+async function dbDel(ref){
+  let last;
+  for(let i=0;i<4;i++){
+    try{ return await ref.delete(); }
+    catch(e){ last=e; if(e && (e.code==="resource_exhausted" || e.code==="unavailable")){ await sleep(1500*(i+1)); continue; } throw e; }
+  }
+  throw last;
+}
 function errMsg(err){
   const c = err && err.code;
   if(c==="quota_exceeded") return "저장 공간이 가득 찼어요. 오래된 내역을 지워주세요.";
   if(c==="invalid_argument") return "저장 권한이 없어요. 본인 계정으로 열었는지 확인하세요.";
-  return "저장하지 못했어요. 잠시 후 다시 시도하세요.";
+  if(c==="resource_exhausted") return "잠깐 사이에 저장이 너무 많았어요. 1분쯤 뒤에 다시 눌러주세요.";
+  return "저장하지 못했어요. 잠시 후 다시 시도하세요." + (c? " ("+c+")" : "");
 }
 
 /* ---------- settings writes ---------- */
@@ -782,14 +801,14 @@ let writeChain = Promise.resolve();
 function saveSettings(next){
   S.settings = next; render();
   if(!S.db){ toast("저장소에 연결되지 않았어요"); return Promise.resolve(); }
-  writeChain = writeChain.then(()=>S.setDoc.set(next)).then(()=>toast("저장했어요")).catch(()=>toast("설정을 저장하지 못했어요"));
+  writeChain = writeChain.then(()=>dbSet(S.setDoc, next)).then(()=>toast("저장했어요")).catch(e=>toast("설정을 저장하지 못했어요"+(e&&e.code?" ("+e.code+")":"")));
   return writeChain;
 }
 async function renameInTx(type, oldName, newName){
   const hits = S.txs.filter(t=>t.type===type && t.cat===oldName);
   for(const t of hits){
     const {id, ...body} = t;
-    try{ await S.txCol.doc(id).set({...body, cat:newName}); }catch(e){}
+    try{ await dbSet(S.txCol.doc(id), {...body, cat:newName}); await sleep(300); }catch(e){}
   }
   if(hits.length) toast(`내역 ${hits.length}건의 항목 이름도 바꿨어요`);
 }
@@ -838,7 +857,7 @@ $("main").addEventListener("change", async e=>{
       if(typeOfKey[key]) await renameInTx(typeOfKey[key], old, name);
       else { // pay
         const hits=S.txs.filter(t=>t.pay===old);
-        for(const t of hits){ const {id,...b}=t; try{ await S.txCol.doc(id).set({...b,pay:name}); }catch(_){} }
+        for(const t of hits){ const {id,...b}=t; try{ await dbSet(S.txCol.doc(id), {...b,pay:name}); await sleep(300); }catch(_){} }
       }
     }
   } else if(el.dataset.budget!==undefined){
@@ -996,8 +1015,8 @@ async function runRecurring(){
         if(date>today) break;
         const id="rec-"+r.id+"-"+y+pad(m);
         if(!S.txs.some(t=>t.id===id)){
-          await S.txCol.doc(id).set({date,type:r.type,cat:r.cat,memo:r.memo||"",amount:+r.amount||0,pay:r.pay||"",toPay:r.toPay||"",note:r.note||"",createdAt:new Date(dy,dm-1,d,9).getTime(),recur:r.id});
-          made++;
+          await dbSet(S.txCol.doc(id), {date,type:r.type,cat:r.cat,memo:r.memo||"",amount:+r.amount||0,pay:r.pay||"",toPay:r.toPay||"",note:r.note||"",createdAt:new Date(dy,dm-1,d,9).getTime(),recur:r.id});
+          made++; await sleep(300);
         }
         r.last=y+"-"+pad(m); changed=true;
       }
@@ -1017,31 +1036,40 @@ const FIX1_RECUR = [
   ["2026-12-01","기아스트리밍구독",5000],["2026-12-03","클로드구독",30500],["2026-12-03","카카오이모티콘구독",3900],
   ["2026-12-08","햇살론 이자",8630],["2026-12-10","농협손해보험",11817]];
 async function applyFix1(){
+  if(!S.txs.some(t=>t.date==="2026-11-16" && (t.memo==="국민은행 이자") && +t.amount===228024)) return;
   const c0 = cfg();
-  if(c0.fix1) return;
-  if(!S.txs.some(t=>t.date==="2026-11-16" && t.memo==="국민은행 이자" && +t.amount===228024)) return;
-  const c = clone(c0);
-  // 1) 결제수단 계좌이체 → 국민이체
-  for(const t of S.txs.filter(t=>t.pay==="계좌이체")){ const {id,...b}=t; await S.txCol.doc(id).set({...b, pay:"국민이체"}); t.pay="국민이체"; }
-  c.pay = (c.pay||[]).includes("국민이체") ? c.pay.filter(x=>x!=="계좌이체") : (c.pay||[]).map(x=>x==="계좌이체"?"국민이체":x);
-  if(!c.pay.includes("국민이체")) c.pay.push("국민이체");
-  (c.assets||[]).forEach(x=>{ if(x.pays) x.pays = Array.from(new Set(x.pays.map(v=>v==="계좌이체"?"국민이체":v))); });
-  // 2) 12/8 대출이자 8,630원 → 햇살론 이자
-  for(const t of S.txs.filter(t=>t.date==="2026-12-08" && +t.amount===8630 && t.memo==="대출이자")){ const {id,...b}=t; await S.txCol.doc(id).set({...b, memo:"햇살론 이자"}); t.memo="햇살론 이자"; }
-  (c.assets||[]).forEach(x=>{ if(x.kind==="부채" && /햇살론/.test(x.name||"")) x.kw="햇살론"; });
-  // 3) 고정 지출 등록 (이미 적은 달까지는 입력된 것으로 처리)
-  c.recurring = c.recurring||[];
-  let n=0;
-  for(const [date,memo,amount] of FIX1_RECUR){
-    const t = S.txs.find(t=>t.date===date && t.memo===memo && +t.amount===amount);
-    if(!t) continue;
-    const rid = "fix1-"+(++n);
-    if(c.recurring.some(r=>r.id===rid)) continue;
-    c.recurring.push({id:rid, day:+date.slice(8), type:t.type, cat:t.cat, memo:t.memo, amount, pay:t.pay||"", toPay:"", note:t.note||"", last:date.slice(0,7)});
-    const {id,...b}=t; await S.txCol.doc(id).set({...b, recur:rid});
+  // 1단계: 설정(결제수단·고정지출 규칙·자산) 먼저 한 번에 저장
+  if(!c0.fix1){
+    const c = clone(c0);
+    c.pay = (c.pay||[]).includes("국민이체") ? c.pay.filter(x=>x!=="계좌이체") : (c.pay||[]).map(x=>x==="계좌이체"?"국민이체":x);
+    if(!c.pay.includes("국민이체")) c.pay.push("국민이체");
+    (c.assets||[]).forEach(x=>{ if(x.pays) x.pays = Array.from(new Set(x.pays.map(v=>v==="계좌이체"?"국민이체":v))); if(x.kind==="부채" && /햇살론/.test(x.name||"")) x.kw="햇살론"; });
+    c.recurring = c.recurring||[];
+    FIX1_RECUR.forEach(([date,memo,amount],k)=>{
+      const rid="fix1-"+(k+1); if(c.recurring.some(r=>r.id===rid)) return;
+      const m2 = memo==="햇살론 이자" ? ["햇살론 이자","대출이자"] : [memo];
+      const t = S.txs.find(t=>t.date===date && m2.includes(t.memo) && +t.amount===amount);
+      if(!t) return;
+      c.recurring.push({id:rid, day:+date.slice(8), type:t.type, cat:t.cat, memo, amount, pay: t.pay==="계좌이체"?"국민이체":(t.pay||""), toPay:"", note:t.note||"", last:date.slice(0,7)});
+    });
+    c.fix1 = true;
+    S.settings = c;
+    await dbSet(S.setDoc, c);
   }
-  c.fix1 = true;
-  await saveSettings(c);
+  // 2단계: 바꿀 내역만 천천히 고치기 (중간에 끊겨도 다음에 열 때 이어서)
+  if(cfg().fix1tx) return;
+  const rules = cfg().recurring||[];
+  let changed = 0;
+  for(const t of S.txs.slice()){
+    const {id,...b} = t; let nb = null;
+    if(b.pay==="계좌이체"){ nb = {...(nb||b), pay:"국민이체"}; }
+    if(b.date==="2026-12-08" && +b.amount===8630 && b.memo==="대출이자"){ nb = {...(nb||b), memo:"햇살론 이자"}; }
+    const cur = nb||b;
+    const k = FIX1_RECUR.findIndex(([d,m,a])=>d===cur.date && m===cur.memo && a===+cur.amount);
+    if(k>=0 && !cur.recur && rules.some(r=>r.id==="fix1-"+(k+1))){ nb = {...cur, recur:"fix1-"+(k+1)}; }
+    if(nb){ await dbSet(S.txCol.doc(id), nb); changed++; await sleep(400); }
+  }
+  const c2 = clone(cfg()); c2.fix1tx = true; S.settings = c2; await dbSet(S.setDoc, c2);
   toast("결제수단·고정지출 정리를 마쳤어요");
 }
 let readyRan=false;

@@ -554,7 +554,7 @@ function renderSet(){
   if(!rec.length) h += `<div class="empty" style="padding:6px 0">내역을 추가할 때 「매달 자동 입력」을 켜면 여기에 생겨요.</div>`;
   rec.forEach((r,i)=>{
     if(S.confirmDel==="rec:"+i){ h += `<div class="set-item confirm"><span class="cmsg"><b>${esc(r.memo||r.cat)}</b> 고정 내역을 그만할까요?<br><small>이미 들어간 내역은 그대로 남아요</small></span><button class="mini danger" data-rdelyes="${i}">삭제</button><button class="mini" data-delno="1">취소</button></div>`; return; }
-    h += `<div class="rec-row"><span class="mid"><b>매달 ${r.day}일 · ${esc(r.memo||r.cat)}</b><small>${esc(r.type)} · ${esc(r.type==="이체"?(r.pay+" → "+(r.toPay||"")):r.cat)}${r.type!=="이체"&&r.pay?" · "+esc(r.pay):""}</small></span>
+    h += `<div class="rec-row"><span class="mid"><b>매달 <select data-rday="${i}" aria-label="날짜" style="border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:1px 2px;font:inherit;font-weight:600">${Array.from({length:31},(_,k)=>k+1).map(d=>`<option ${d===r.day?"selected":""}>${d}</option>`).join("")}</select>일 · ${esc(r.memo||r.cat)}</b><small>${esc(r.type)} · ${esc(r.type==="이체"?(r.pay+" → "+(r.toPay||"")):r.cat)}${r.type!=="이체"&&r.pay?" · "+esc(r.pay):""}</small></span>
       <input class="money" inputmode="numeric" data-ramt="${i}" value="${won(r.amount)}" aria-label="금액"><button class="del" data-rdel="${i}" aria-label="삭제">✕</button></div>
       <label class="chk" style="font-size:12px;color:var(--muted);padding:0 0 6px"><input type="checkbox" data-rshift="${i}" ${r.shift!==false?"checked":""} style="width:15px;height:15px"> 주말·공휴일이면 다음 영업일에 입력</label>`;
   });
@@ -800,6 +800,7 @@ $("main").addEventListener("change", async e=>{
   const el = e.target;
   if(el.id==="startPrev"){ const c=clone(cfg()); c.startPrev=el.checked; S.settings=c; const [y,m]=periodOf(todayStr()); S.y=y; S.m=m; saveSettings(c); return; }
   if(el.id==="startDay"){ const c=clone(cfg()); c.startDay=+el.value; S.settings=c; const [y,m]=periodOf(todayStr()); S.y=y; S.m=m; saveSettings(c); return; }
+  if(el.dataset.rday!==undefined){ const c=clone(cfg()), r=c.recurring[+el.dataset.rday]; if(!r) return; r.day=+el.value; saveSettings(c); return; }
   if(el.dataset.rshift!==undefined){ const c=clone(cfg()), r=c.recurring[+el.dataset.rshift]; if(!r) return; r.shift=el.checked; saveSettings(c); return; }
   if(el.dataset.ramt!==undefined){ const c=clone(cfg()), r=c.recurring[+el.dataset.ramt]; if(!r) return; const v=parseMoney(el.value); if(!v||v===r.amount){ el.value=won(r.amount); return; } r.amount=v; saveSettings(c); return; }
   if(el.dataset.akw!==undefined || el.dataset.arate!==undefined || el.dataset.agrace!==undefined){
@@ -1006,11 +1007,48 @@ async function runRecurring(){
   }catch(e){ console.log("recurring", e); }
   finally{ recurBusy=false; }
 }
+
+/* ---------- 재연님 데이터 1회 정리 (2026-11-16 요청) ----------
+   본인 데이터(11/16 국민은행 이자 228,024원이 있는 데이터)에서만 한 번 실행 */
+const FIX1_RECUR = [
+  ["2026-11-16","국민은행 이자",228024],["2026-11-16","메리츠운전자보험",29290],["2026-11-18","쿠팡와우",7890],
+  ["2026-11-19","유튜브구독",14900],["2026-11-20","보험",76513],["2026-11-23","장기렌트비",517890],
+  ["2026-11-23","휴대폰요금",125400],["2026-11-27","넷플릭스구독",13500],["2026-11-30","전북원리금",57952],
+  ["2026-12-01","기아스트리밍구독",5000],["2026-12-03","클로드구독",30500],["2026-12-03","카카오이모티콘구독",3900],
+  ["2026-12-08","햇살론 이자",8630],["2026-12-10","농협손해보험",11817]];
+async function applyFix1(){
+  const c0 = cfg();
+  if(c0.fix1) return;
+  if(!S.txs.some(t=>t.date==="2026-11-16" && t.memo==="국민은행 이자" && +t.amount===228024)) return;
+  const c = clone(c0);
+  // 1) 결제수단 계좌이체 → 국민이체
+  for(const t of S.txs.filter(t=>t.pay==="계좌이체")){ const {id,...b}=t; await S.txCol.doc(id).set({...b, pay:"국민이체"}); t.pay="국민이체"; }
+  c.pay = (c.pay||[]).includes("국민이체") ? c.pay.filter(x=>x!=="계좌이체") : (c.pay||[]).map(x=>x==="계좌이체"?"국민이체":x);
+  if(!c.pay.includes("국민이체")) c.pay.push("국민이체");
+  (c.assets||[]).forEach(x=>{ if(x.pays) x.pays = Array.from(new Set(x.pays.map(v=>v==="계좌이체"?"국민이체":v))); });
+  // 2) 12/8 대출이자 8,630원 → 햇살론 이자
+  for(const t of S.txs.filter(t=>t.date==="2026-12-08" && +t.amount===8630 && t.memo==="대출이자")){ const {id,...b}=t; await S.txCol.doc(id).set({...b, memo:"햇살론 이자"}); t.memo="햇살론 이자"; }
+  (c.assets||[]).forEach(x=>{ if(x.kind==="부채" && /햇살론/.test(x.name||"")) x.kw="햇살론"; });
+  // 3) 고정 지출 등록 (이미 적은 달까지는 입력된 것으로 처리)
+  c.recurring = c.recurring||[];
+  let n=0;
+  for(const [date,memo,amount] of FIX1_RECUR){
+    const t = S.txs.find(t=>t.date===date && t.memo===memo && +t.amount===amount);
+    if(!t) continue;
+    const rid = "fix1-"+(++n);
+    if(c.recurring.some(r=>r.id===rid)) continue;
+    c.recurring.push({id:rid, day:+date.slice(8), type:t.type, cat:t.cat, memo:t.memo, amount, pay:t.pay||"", toPay:"", note:t.note||"", last:date.slice(0,7)});
+    const {id,...b}=t; await S.txCol.doc(id).set({...b, recur:rid});
+  }
+  c.fix1 = true;
+  await saveSettings(c);
+  toast("결제수단·고정지출 정리를 마쳤어요");
+}
 let readyRan=false;
 function dataReady(){
   if(!S.loaded || !S.setLoaded) return;
   if(!S.navTouched && !readyRan){ const [y,m]=periodOf(todayStr()); S.y=y; S.m=m; render(); }
-  if(!readyRan){ readyRan=true; setTimeout(runRecurring, 600); }
+  if(!readyRan){ readyRan=true; setTimeout(async ()=>{ try{ await applyFix1(); }catch(e){ console.log("fix1",e); } runRecurring(); }, 600); }
 }
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible" && readyRan) setTimeout(runRecurring, 600); });
 

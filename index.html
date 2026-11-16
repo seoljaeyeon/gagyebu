@@ -97,7 +97,7 @@ main{flex:1;overflow-y:auto;padding:0 16px 110px;display:flex;flex-direction:col
 .legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
 svg text{fill:var(--muted);font-size:10px;font-family:var(--font)}
 nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding:6px 0 calc(env(safe-area-inset-bottom) + 6px)}
-nav.tabs .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr)}
+nav.tabs .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
 nav.tabs button{border:0;background:transparent;padding:8px 0;font-size:12px;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px}
 nav.tabs button.on{color:var(--accent);font-weight:600}
 .fab{position:fixed;right:max(16px, calc(50% - 264px));bottom:calc(env(safe-area-inset-bottom) + 74px);width:56px;height:56px;border-radius:50%;border:0;background:var(--accent);color:var(--surface);font-size:28px;line-height:1;box-shadow:0 6px 18px rgba(0,0,0,.18)}
@@ -157,6 +157,16 @@ nav.tabs button.on{color:var(--accent);font-weight:600}
 .add-bar{display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)}
 .add-bar input{flex:1;min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:9px;padding:9px 10px}
 .add-bar input.money{flex:none;width:96px;text-align:right}
+.asset-row{display:flex;flex-direction:column;gap:4px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.asset-row:last-child{border-bottom:0}
+.alink{display:flex;align-items:center;gap:8px;padding-left:28px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.alink select{border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:4px 6px;font-size:12px;max-width:170px}
+.aopts{display:flex;flex-wrap:wrap;gap:6px 14px;padding-left:28px;font-size:12px;color:var(--muted)}
+.aopts .chip{padding:3px 9px;font-size:12px}
+.aopts .chip.on{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.aopts .grp{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.aopts input.tiny{border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:4px 6px;font-size:12px;width:76px}
+.alink input.tiny{border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:4px 6px;font-size:12px;width:64px}
 .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 140px);transform:translateX(-50%);background:var(--ink);color:var(--surface);padding:10px 16px;border-radius:999px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:20;white-space:nowrap}
 .toast.show{opacity:1}
 </style>
@@ -179,6 +189,7 @@ nav.tabs button.on{color:var(--accent);font-weight:600}
 <nav class="tabs"><div class="in">
   <button data-tab="list" class="on"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>내역</button>
   <button data-tab="sum"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V11M12 20V5M19 20v-6"/></svg>요약</button>
+  <button data-tab="asset"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l9-6 9 6"/><path d="M5 10v9M9.5 10v9M14.5 10v9M19 10v9M3 20h18"/></svg>자산</button>
   <button data-tab="set"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>설정</button>
 </div></nav>
 
@@ -241,9 +252,10 @@ function sums(list){
 
 /* ---------- render ---------- */
 function render(){
-  $("title").textContent = S.y+"년 "+S.m+"월";
+  $("title").textContent = S.tab==="asset" ? "재산 현황" : S.y+"년 "+S.m+"월";
+  $("prev").style.visibility = $("next").style.visibility = S.tab==="asset" ? "hidden" : "";
   document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.toggle("on", b.dataset.tab===S.tab));
-  $("fab").hidden = S.tab==="set";
+  $("fab").hidden = S.tab==="set" || S.tab==="asset";
   const main=$("main");
   let html = "";
   if(S.installTip) html += `<div class="banner" style="background:var(--accent-soft);color:var(--accent)">Safari 아래 공유 버튼 → <b>홈 화면에 추가</b> 후 그 아이콘으로 쓰세요. Safari 탭에서 입력한 내용은 홈 화면 앱과 따로 저장돼요.</div>`;
@@ -251,12 +263,14 @@ function render(){
   if(S.slow) html += `<div class="banner">데이터를 아직 불러오지 못했어요. 인터넷 연결을 확인해 주세요.</div>`;
   if(S.tab==="list") html += renderList();
   else if(S.tab==="sum") html += renderSum();
+  else if(S.tab==="asset") html += renderAsset();
   else html += renderSet();
   // 다시 그릴 때 입력 중이던 칸의 값과 커서를 유지
   const keep = {}; main.querySelectorAll("input[id]").forEach(el=>{ if(el.type!=="file") keep[el.id]=el.value; });
   const act = document.activeElement && main.contains(document.activeElement) && document.activeElement.id ? document.activeElement.id : null;
+  if(S.composing && act) return; // 한글 조합 중에는 다시 그리지 않음 (글자 깨짐 방지)
   main.innerHTML = html;
-  Object.keys(keep).forEach(id=>{ const el=$(id); if(el && (id.startsWith("new")) ) el.value=keep[id]; });
+  Object.keys(keep).forEach(id=>{ const el=$(id); if(el && (id.startsWith("new") || id===act)) el.value=keep[id]; });
   const fid = S.refocus || act; S.refocus = null;
   if(fid){ const el=$(fid); if(el){ el.focus({preventScroll:true}); } }
 }
@@ -445,6 +459,110 @@ function renderSet(){
   return h;
 }
 
+
+/* ---------- 재산 현황 ---------- */
+const ASSET_KINDS = ["자산","부채"];
+// 연결된 항목의 내역 중, 마지막으로 금액을 직접 맞춘 뒤(baseAt 이후)에 입력된 것만 자동 반영
+function linkOptions(kind){
+  const c=cfg();
+  return kind==="부채" ? c.expense.map(e=>"지출|"+e.name) : ["통장|"].concat(c.saving.map(n=>"저축|"+n));
+}
+// 통장: 고른 결제수단으로 들어오고 나간 돈(수입 +, 지출·저축 −)
+function bankTx(x){
+  const at=x.baseAt||0, pays=x.pays||[];
+  return S.txs.filter(t=>(t.createdAt||0) > at && pays.includes(t.pay));
+}
+function linkedTx(x){
+  if(!x.link || x.link==="통장|") return [];
+  const [type,cat] = x.link.split("|"), at = x.baseAt||0, kw=(x.kw||"").trim();
+  return S.txs.filter(t=>t.type===type && t.cat===cat && (t.createdAt||0) > at && (!kw || (t.memo||"").includes(kw) || (t.note||"").includes(kw)))
+    .sort((a,b)=> a.date<b.date?-1:a.date>b.date?1:(a.createdAt||0)-(b.createdAt||0));
+}
+// 부채: 연 이자율이 있으면 원리금균등으로 보고 납부액 = 이자(잔액×연이율/12) + 원금, 원금만 차감
+function loanCalc(x){
+  let bal = x.base ?? x.balance ?? 0, principal=0, interest=0;
+  const r = (+x.rate||0)/100/12;
+  linkedTx(x).forEach(t=>{
+    const pay=+t.amount||0;
+    if(x.grace && t.date.slice(0,7) < x.grace){ interest+=pay; return; } // 거치 기간: 이자만 납부
+    const it = r? Math.min(pay, Math.round(bal*r)) : 0, pr = Math.min(bal, pay-it);
+    interest+=it; principal+=pr; bal-=pr;
+  });
+  return {principal, interest};
+}
+function assetDelta(x){
+  if(!x.link) return 0;
+  if(x.kind==="부채") return -loanCalc(x).principal;
+  if(x.link==="통장|") return bankTx(x).reduce((a,t)=>a+(t.type==="수입"?1:-1)*(+t.amount||0),0);
+  return linkedTx(x).reduce((a,t)=>a+(+t.amount||0),0);
+}
+function assetBalance(x){ return (x.base ?? x.balance ?? 0) + assetDelta(x); }
+function assetTotals(list){
+  let a=0,l=0; (list||[]).forEach(x=>{ const b=assetBalance(x); if(x.kind==="부채") l+=b; else a+=b; });
+  return {a,l,net:a-l};
+}
+function rebase(x, value){ x.base=value; x.balance=value; x.baseAt=Date.now(); x.updatedAt=Date.now(); }
+function renderAsset(){
+  const c = cfg(), list = c.assets||[], T = assetTotals(list);
+  const last = list.reduce((m,x)=>Math.max(m,x.updatedAt||0),0);
+  let h = `<section class="card"><div class="totals">
+    <div class="big" style="border-top:0;padding-top:0"><span class="lab">순자산 (자산−부채)</span><span class="val num ${T.net<0?"c-bad":""}">${won(T.net)}원</span></div>
+    <div><div class="lab">자산</div><div class="val num c-inc">${won(T.a)}</div></div>
+    <div><div class="lab">부채</div><div class="val num c-exp">${won(T.l)}</div></div>
+  </div>${last?`<p class="hint" style="margin-top:12px">마지막 수정 ${new Date(last).toLocaleDateString("ko-KR")}</p>`:""}</section>`;
+  ASSET_KINDS.forEach(kind=>{
+    const rows = list.map((x,i)=>({x,i})).filter(o=>(o.x.kind||"자산")===kind);
+    const sub = rows.reduce((s,o)=>s+assetBalance(o.x),0);
+    h += `<section class="card"><h2>${kind} <span class="num ${kind==="부채"?"c-exp":"c-inc"}" style="float:right">${won(sub)}</span></h2><div class="set-list">`;
+    if(!rows.length) h += `<div class="empty" style="padding:6px 0">${kind==="자산"?"통장, 적금, 투자, 보증금 등을 추가하세요.":"대출, 카드값 등을 추가하세요."}</div>`;
+    rows.forEach(({x,i},k)=>{
+      if(S.confirmDel==="asset:"+i){
+        h += `<div class="set-item confirm"><span class="cmsg"><b>${esc(x.name)}</b> 삭제할까요?</span><button class="mini danger" data-adelyes="${i}">삭제</button><button class="mini" data-delno="1">취소</button></div>`;
+        return;
+      }
+      const opts = linkOptions(kind); if(x.link && !opts.includes(x.link)) opts.push(x.link);
+      const delta = assetDelta(x);
+      let delText = "";
+      if(kind==="부채" && x.link){ const L=loanCalc(x); if(L.principal||L.interest) delText = '<span class="num c-exp">원금 −'+won(L.principal)+' 반영됨'+(L.interest? ' · 이자 '+won(L.interest) : '')+'</span>'; }
+      else if(x.link==="통장|"){ const L=bankTx(x); const inn=L.filter(t=>t.type==="수입").reduce((a,t)=>a+(+t.amount||0),0), out=L.filter(t=>t.type!=="수입").reduce((a,t)=>a+(+t.amount||0),0);
+        if(inn||out) delText = '<span class="num"><span class="c-inc">+'+won(inn)+'</span> · <span class="c-exp">−'+won(out)+'</span> 반영됨</span>'; }
+      else if(delta) delText = '<span class="num c-sav">+'+won(delta)+' 반영됨</span>';
+      h += `<div class="asset-row"><div class="set-item"><div class="mv"><button data-amv="${i}" data-d="-1" aria-label="위로" ${k===0?"disabled":""}>▲</button><button data-amv="${i}" data-d="1" aria-label="아래로" ${k===rows.length-1?"disabled":""}>▼</button></div>
+        <input value="${esc(x.name)}" data-aname="${i}" aria-label="이름">
+        <input class="money" style="width:118px" inputmode="numeric" value="${won(assetBalance(x))}" data-abal="${i}" aria-label="${esc(x.name)} 금액">
+        <button class="del" data-adel="${i}" aria-label="${esc(x.name)} 삭제">✕</button></div>
+        <div class="alink"><label for="alink-${i}">자동 연결</label><select id="alink-${i}" data-alink="${i}"><option value="">없음</option>${opts.map(o=>`<option value="${esc(o)}" ${o===x.link?"selected":""}>${o==="통장|"?"통장 (결제수단 기준)":esc(o.replace("|"," · "))}</option>`).join("")}</select></div>${x.link==="통장|"?`<div class="aopts"><span>결제수단</span>${cfg().pay.map(pm=>`<button class="chip ${(x.pays||[]).includes(pm)?"on":""}" data-apay="${i}" data-v="${esc(pm)}">${esc(pm)}</button>`).join("")}</div>`:""}${kind==="부채"&&x.link?`<div class="aopts">
+          <label class="grp" for="akw-${i}"><span>구분 단어</span><input id="akw-${i}" class="tiny" data-akw="${i}" value="${esc(x.kw||"")}" placeholder="예: 국민"></label>
+          <label class="grp" for="arate-${i}"><span>연 이자율</span><input id="arate-${i}" class="tiny num" style="width:52px" inputmode="decimal" data-arate="${i}" value="${x.rate==null?"":x.rate}" placeholder="0"><span>%</span></label>
+          <label class="grp" for="agrace-${i}"><span>거치 끝</span><input id="agrace-${i}" type="month" class="tiny" style="width:128px" data-agrace="${i}" value="${esc(x.grace||"")}"></label>
+        </div>`:""}${delText?`<div class="alink">${delText}</div>`:""}</div>`;
+    });
+    h += `</div><div class="add-bar"><input id="new-asset-${kind}" placeholder="${kind==="자산"?"예: 국민 통장":"예: 전세대출"}" enterkeyhint="done"><input class="money" id="newb-asset-${kind}" inputmode="numeric" placeholder="금액" enterkeyhint="done"><button class="mini primary" data-aadd="${kind}">추가</button></div><p class="hint">${kind==="자산"?"통장은 「통장 (결제수단 기준)」을 고르고 그 통장에서 돈이 나가는 결제수단(체크카드, 계좌이체 등)을 켜세요. 그 결제수단으로 적은 수입은 더하고 지출·저축은 빼요. 적금·투자는 저축 항목을 연결하면 저축할 때마다 늘어나요.":"납부하는 지출 항목을 연결하면 낼 때마다 부채가 줄어요. 연 이자율을 넣으면 원리금균등으로 보고 납부액에서 이자를 뺀 원금만 줄여요. 같은 항목에 대출이 여러 개면 「구분 단어」에 내역 내용에 들어가는 단어를 넣으세요. 그 단어가 들어간 내역만 반영돼요. 이자만 내는 기간이 있으면 「거치 끝」에 원리금 상환이 시작되는 달을 넣으세요. 그 전 납부는 이자로만 계산하고 원금은 줄이지 않아요."} 금액을 직접 고치면 그 금액부터 다시 계산해요.</p></section>`;
+  });
+  // 순자산 추이
+  const hist = Object.assign({}, c.netHistory||{});
+  if(list.length){ const d=new Date(); hist[d.getFullYear()+"-"+pad(d.getMonth()+1)] = {net:T.net}; }
+  const keys = Object.keys(hist).sort().slice(-12);
+  if(keys.length){
+    const vals = keys.map(k=>hist[k].net);
+    const max = Math.max(1,...vals.map(Math.abs)), step=niceStep(max/3), top=Math.ceil(max/step)*step, hasNeg = vals.some(v=>v<0);
+    const W=340,H=160,L=40,B=20,T0=8, lo = hasNeg? -top:0, cw=(W-L)/Math.max(keys.length,6), bw=Math.min(18,cw*0.6);
+    const y = v => T0 + (H-T0-B)*(top-v)/(top-lo);
+    let g="";
+    for(let v=lo; v<=top+1e-6; v+=step) g += `<line x1="${L}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L-4}" y="${y(v)+3}" text-anchor="end">${Math.abs(v)>=10000? Math.round(v/10000).toLocaleString("ko-KR")+"만": v}</text>`;
+    keys.forEach((k,i)=>{ const v=hist[k].net, x=L+i*cw+(cw-bw)/2, y0=y(0), y1=y(v);
+      g += `<rect x="${x}" y="${Math.min(y0,y1)}" width="${bw}" height="${Math.max(1,Math.abs(y0-y1))}" rx="2" fill="${v<0?"var(--exp)":"var(--accent)"}"/><text x="${x+bw/2}" y="${H-5}" text-anchor="middle">${+k.slice(5)}월</text>`; });
+    h += `<section class="card"><h2>월별 순자산</h2><svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="월별 순자산">${g}</svg><p class="hint">이번 달은 현재 순자산, 지난달은 그 달 마지막으로 기록된 순자산이에요.</p></section>`;
+  }
+  return h;
+}
+function saveAssets(list){
+  const c = clone(cfg()); c.assets = list;
+  const T = assetTotals(list), d=new Date(), k=d.getFullYear()+"-"+pad(d.getMonth()+1);
+  c.netHistory = Object.assign({}, c.netHistory||{}, {[k]:{a:T.a,l:T.l,net:T.net}});
+  return saveSettings(c);
+}
+
 /* ---------- sheet ---------- */
 function openSheet(tx){
   S.editing = tx ? tx.id : null;
@@ -496,7 +614,8 @@ $("sheet").addEventListener("submit", async e=>{
     else await S.txCol.add(body);
     const [y,m] = date.split("-").map(Number);
     if(y!==S.y || m!==S.m){ S.y=y; S.m=m; render(); }
-    closeSheet(); toast(S.editing===null?"저장했어요":"저장했어요");
+    closeSheet(); toast("저장했어요");
+    if((cfg().assets||[]).some(x=>x.link)) setTimeout(()=>saveAssets(clone(cfg().assets)), 300); // 이번 달 순자산 기록 갱신
   }catch(err){ $("fErr").textContent = errMsg(err); }
   finally{ $("fSave").disabled = false; }
 });
@@ -504,7 +623,7 @@ let delArmed = false;
 $("fDel").addEventListener("click", async ()=>{
   if(!delArmed){ delArmed=true; $("fDel").textContent="한 번 더 누르면 삭제"; setTimeout(()=>{delArmed=false; $("fDel").textContent="삭제";},2500); return; }
   delArmed=false; $("fDel").textContent="삭제";
-  try{ await S.txCol.doc(S.editing).delete(); closeSheet(); toast("삭제했어요"); }
+  try{ await S.txCol.doc(S.editing).delete(); closeSheet(); toast("삭제했어요"); if((cfg().assets||[]).some(x=>x.link)) setTimeout(()=>saveAssets(clone(cfg().assets)), 300); }
   catch(err){ $("fErr").textContent = errMsg(err); }
 });
 function errMsg(err){
@@ -519,7 +638,7 @@ let writeChain = Promise.resolve();
 function saveSettings(next){
   S.settings = next; render();
   if(!S.db){ toast("저장소에 연결되지 않았어요"); return Promise.resolve(); }
-  writeChain = writeChain.then(()=>S.setDoc.set(next)).then(()=>toast("설정 저장됨")).catch(()=>toast("설정을 저장하지 못했어요"));
+  writeChain = writeChain.then(()=>S.setDoc.set(next)).then(()=>toast("저장했어요")).catch(()=>toast("설정을 저장하지 못했어요"));
   return writeChain;
 }
 async function renameInTx(type, oldName, newName){
@@ -535,6 +654,26 @@ const typeOfKey = {expense:"지출", income:"수입", saving:"저축"};
 
 $("main").addEventListener("change", async e=>{
   const el = e.target;
+  if(el.dataset.akw!==undefined || el.dataset.arate!==undefined || el.dataset.agrace!==undefined){
+    const list=clone(cfg().assets||[]), x=list[+(el.dataset.akw ?? el.dataset.arate ?? el.dataset.agrace)]; if(!x) return;
+    if(el.dataset.agrace!==undefined){ const v=/^\d{4}-\d{2}$/.test(el.value)? el.value : ""; if(v===(x.grace||"")) return; x.grace=v; }
+    else if(el.dataset.akw!==undefined){ const v=el.value.trim(); if(v===(x.kw||"")) return; x.kw=v; }
+    else { const v=el.value.trim()===""? null : Math.max(0, parseFloat(el.value.replace(",","."))||0); if(v===(x.rate??null)) return; x.rate=v; }
+    saveAssets(list); return;
+  }
+  if(el.dataset.alink!==undefined){
+    const list=clone(cfg().assets||[]), x=list[+el.dataset.alink]; if(!x) return;
+    rebase(x, assetBalance(x)); x.link = el.value;
+    if(x.link==="통장|" && !x.pays) x.pays = cfg().pay.filter(pm=>pm==="체크카드"||pm==="계좌이체");
+    saveAssets(list); return;
+  }
+  if(el.dataset.aname!==undefined || el.dataset.abal!==undefined){
+    const list=clone(cfg().assets||[]), i=+(el.dataset.aname ?? el.dataset.abal);
+    if(!list[i]) return;
+    if(el.dataset.aname!==undefined){ const v=el.value.trim(); if(!v){ el.value=list[i].name; return; } if(v===list[i].name) return; list[i].name=v; }
+    else { const v=parseMoney(el.value); if(v===assetBalance(list[i])) return; rebase(list[i], v); }
+    list[i].updatedAt=Date.now(); saveAssets(list); return;
+  }
   if(el.dataset.set){
     const key=el.dataset.set, i=+el.dataset.i, c=clone(cfg());
     const name = el.value.trim();
@@ -544,6 +683,7 @@ $("main").addEventListener("change", async e=>{
     const list = key==="expense"? c.expense.map(x=>x.name) : c[key];
     if(list.includes(name)){ toast("이미 있는 이름이에요"); el.value=old; return; }
     if(key==="expense") c.expense[i].name=name; else c[key][i]=name;
+    if(typeOfKey[key] && c.assets) c.assets.forEach(x=>{ if(x.link===typeOfKey[key]+"|"+old) x.link=typeOfKey[key]+"|"+name; });
     await saveSettings(c);
     if(old && S.db){
       if(typeOfKey[key]) await renameInTx(typeOfKey[key], old, name);
@@ -558,13 +698,16 @@ $("main").addEventListener("change", async e=>{
     const c=clone(cfg()); c.saveTarget = parseMoney(el.value); saveSettings(c);
   }
 });
+$("main").addEventListener("compositionstart", ()=>{ S.composing=true; });
+$("main").addEventListener("compositionend", ()=>{ S.composing=false; });
 $("main").addEventListener("keydown", e=>{
+  if(e.isComposing) return;
   const el=e.target; if(e.key!=="Enter" || !el.id || !el.id.startsWith("new")) return;
-  e.preventDefault(); const key=el.id.replace(/^newb?-/,""); const b=document.querySelector(`button[data-addset="${key}"]`); b&&b.click();
+  e.preventDefault(); const key=el.id.replace(/^newb?-/,""); const b= key.startsWith("asset-") ? document.querySelector(`button[data-aadd="${key.slice(6)}"]`) : document.querySelector(`button[data-addset="${key}"]`); b&&b.click();
 });
 $("main").addEventListener("input", e=>{
   const el=e.target;
-  if(el.dataset.budget!==undefined || el.id==="saveTarget" || el.id==="newb-expense"){ const d=el.value.replace(/[^0-9]/g,""); el.value = d?Number(d).toLocaleString("ko-KR"):""; }
+  if(el.dataset.budget!==undefined || el.dataset.abal!==undefined || el.id==="saveTarget" || (el.id||"").startsWith("newb-")){ const d=el.value.replace(/[^0-9]/g,""); el.value = d?Number(d).toLocaleString("ko-KR"):""; }
 });
 
 $("main").addEventListener("click", async e=>{
@@ -573,6 +716,26 @@ $("main").addEventListener("click", async e=>{
   if(t.dataset.view){ S.view=t.dataset.view; render(); return; }
   if(t.dataset.day){ S.selDay=t.dataset.day; render(); return; }
   if(t.dataset.edit){ const tx=S.txs.find(x=>x.id===t.dataset.edit); if(tx) openSheet(tx); return; }
+  if(t.dataset.aadd){
+    const kind=t.dataset.aadd, inp=$("new-asset-"+kind), amt=$("newb-asset-"+kind), name=(inp.value||"").trim();
+    if(!name){ toast("이름을 입력하세요"); inp.focus(); return; }
+    const list = clone(cfg().assets||[]);
+    const x={id:Date.now().toString(36), name, kind, link:""}; rebase(x, parseMoney(amt.value)); list.push(x);
+    inp.value=""; amt.value=""; S.refocus="new-asset-"+kind;
+    await saveAssets(list); return;
+  }
+  if(t.dataset.apay){
+    const list=clone(cfg().assets||[]), x=list[+t.dataset.apay]; if(!x) return;
+    rebase(x, assetBalance(x)); const v=t.dataset.v; x.pays = (x.pays||[]).includes(v) ? x.pays.filter(z=>z!==v) : (x.pays||[]).concat(v);
+    saveAssets(list); return;
+  }
+  if(t.dataset.adel){ S.confirmDel="asset:"+t.dataset.adel; render(); return; }
+  if(t.dataset.adelyes){ const list=clone(cfg().assets||[]); list.splice(+t.dataset.adelyes,1); S.confirmDel=null; saveAssets(list); return; }
+  if(t.dataset.amv){
+    const list=clone(cfg().assets||[]), i=+t.dataset.amv, kind=list[i].kind;
+    const same=list.map((x,j)=>j).filter(j=>list[j].kind===kind), p=same.indexOf(i), q=p+(+t.dataset.d);
+    if(q<0||q>=same.length) return; const j=same[q]; [list[i],list[j]]=[list[j],list[i]]; saveAssets(list); return;
+  }
   if(t.dataset.addset){
     const key=t.dataset.addset, c=clone(cfg());
     const inp=$("new-"+key), name=(inp&&inp.value||"").trim();

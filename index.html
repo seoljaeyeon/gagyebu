@@ -299,6 +299,7 @@ function render(){
   let html = "";
   if(S.installTip) html += `<div class="banner" style="background:var(--accent-soft);color:var(--accent)">Safari 아래 공유 버튼 → <b>홈 화면에 추가</b> 후 그 아이콘으로 쓰세요. Safari 탭에서 입력한 내용은 홈 화면 앱과 따로 저장돼요.</div>`;
   if(!LocalStore.ok()) html += `<div class="banner">이 브라우저에서는 저장할 수 없어요. 개인정보 보호 브라우징을 끄고 열어주세요.</div>`;
+  if(S.stale) html += `<div class="banner" style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>저장 연결이 끊겼어요. 앱을 오래 켜두면 생길 수 있어요.</span><button class="mini danger" data-reload="1">새로고침</button></div>`;
   if(S.slow) html += `<div class="banner">데이터를 아직 불러오지 못했어요. 인터넷 연결을 확인해 주세요.</div>`;
   if(S.tab==="list") html += renderList();
   else if(S.tab==="sum") html += renderSum();
@@ -307,7 +308,7 @@ function render(){
   // 다시 그릴 때 입력 중이던 칸의 값과 커서를 유지
   const keep = {}; main.querySelectorAll("input[id]").forEach(el=>{ if(el.type!=="file") keep[el.id]=el.value; });
   const act = document.activeElement && main.contains(document.activeElement) && document.activeElement.id ? document.activeElement.id : null;
-  if(S.composing && act) return; // 한글 조합 중에는 다시 그리지 않음 (글자 깨짐 방지)
+  if(S.composingEl && S.composingEl===document.activeElement && main.contains(S.composingEl)) return; // 한글 조합 중인 칸이 있으면 그리지 않음
   let selS=null, selE=null; try{ if(act){ selS=document.activeElement.selectionStart; selE=document.activeElement.selectionEnd; } }catch(e){}
   main.innerHTML = html;
   Object.keys(keep).forEach(id=>{ const el=$(id); if(el && (id.startsWith("new") || id===act)) el.value=keep[id]; });
@@ -772,18 +773,21 @@ $("fDel").addEventListener("click", async ()=>{
 });
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
 // 저장소 쓰기: 일시적인 거절(횟수 제한·연결 문제)이면 잠깐 쉬었다가 다시 시도
+// 응답이 없으면 15초 뒤 실패로 처리 (저장 줄이 멈춰서 다음 저장까지 막히지 않게)
+function withTimeout(pr){ return Promise.race([pr, new Promise((_,rej)=>setTimeout(()=>rej({code:"timeout"}),15000))]); }
+function noteFatal(e){ const c=e&&e.code; if(["revoked","not_granted","capability_disabled","capability_removed","timeout"].includes(c)){ S.stale=c; render(); } }
 async function dbSet(ref, data){
   let last;
   for(let i=0;i<4;i++){
-    try{ return await ref.set(data); }
-    catch(e){ last=e; if(e && (e.code==="resource_exhausted" || e.code==="unavailable")){ await sleep(1500*(i+1)); continue; } throw e; }
+    try{ return await withTimeout(ref.set(data)); }
+    catch(e){ last=e; if(e && (e.code==="resource_exhausted" || e.code==="unavailable")){ await sleep(1500*(i+1)); continue; } noteFatal(e); throw e; }
   }
-  throw last;
+  noteFatal(last); throw last;
 }
 async function dbDel(ref){
   let last;
   for(let i=0;i<4;i++){
-    try{ return await ref.delete(); }
+    try{ return await withTimeout(ref.delete()); }
     catch(e){ last=e; if(e && (e.code==="resource_exhausted" || e.code==="unavailable")){ await sleep(1500*(i+1)); continue; } throw e; }
   }
   throw last;
@@ -792,6 +796,7 @@ function errMsg(err){
   const c = err && err.code;
   if(c==="quota_exceeded") return "저장 공간이 가득 찼어요. 오래된 내역을 지워주세요.";
   if(c==="invalid_argument") return "저장 권한이 없어요. 본인 계정으로 열었는지 확인하세요.";
+  if(["revoked","not_granted","capability_disabled","timeout"].includes(c)) return "연결이 끊겼어요. 위의 「새로고침」을 눌러주세요.";
   if(c==="resource_exhausted") return "잠깐 사이에 저장이 너무 많았어요. 1분쯤 뒤에 다시 눌러주세요.";
   return "저장하지 못했어요. 잠시 후 다시 시도하세요." + (c? " ("+c+")" : "");
 }
@@ -816,7 +821,7 @@ const clone = o => JSON.parse(JSON.stringify(o));
 const typeOfKey = {expense:"지출", income:"수입", saving:"저축"};
 
 $("main").addEventListener("change", async e=>{
-  const el = e.target;
+  const el = e.target; S.composingEl = null;
   if(el.id==="startPrev"){ const c=clone(cfg()); c.startPrev=el.checked; S.settings=c; const [y,m]=periodOf(todayStr()); S.y=y; S.m=m; saveSettings(c); return; }
   if(el.id==="startDay"){ const c=clone(cfg()); c.startDay=+el.value; S.settings=c; const [y,m]=periodOf(todayStr()); S.y=y; S.m=m; saveSettings(c); return; }
   if(el.dataset.rday!==undefined){ const c=clone(cfg()), r=c.recurring[+el.dataset.rday]; if(!r) return; r.day=+el.value; saveSettings(c); return; }
@@ -866,9 +871,10 @@ $("main").addEventListener("change", async e=>{
     const c=clone(cfg()); c.saveTarget = parseMoney(el.value); saveSettings(c);
   }
 });
-$("main").addEventListener("compositionstart", ()=>{ S.composing=true; });
-$("main").addEventListener("compositionend", e=>{ S.composing=false; if(e.target.id==="q"){ S.q=e.target.value; render(); } });
-$("main").addEventListener("input", e=>{ if(e.target.id==="q" && !e.isComposing && !S.composing){ S.q=e.target.value; render(); } });
+$("main").addEventListener("compositionstart", e=>{ S.composingEl=e.target; });
+$("main").addEventListener("compositionend", e=>{ S.composingEl=null; if(e.target.id==="q"){ S.q=e.target.value; render(); } });
+$("main").addEventListener("focusout", ()=>{ S.composingEl=null; }, true);
+$("main").addEventListener("input", e=>{ if(e.target.id==="q" && !e.isComposing && S.composingEl!==e.target){ S.q=e.target.value; render(); } });
 $("main").addEventListener("keydown", e=>{
   if(e.isComposing) return;
   const el=e.target; if(e.key!=="Enter" || !el.id || !el.id.startsWith("new")) return;
@@ -882,6 +888,7 @@ $("main").addEventListener("input", e=>{
 $("main").addEventListener("click", async e=>{
   const t = e.target.closest("button"); if(!t) return;
   if(t.dataset.filter){ S.filter=t.dataset.filter; render(); return; }
+  if(t.dataset.reload){ location.reload(); return; }
   if(t.dataset.view){ S.view=t.dataset.view; render(); return; }
   if(t.dataset.search){ S.searching=!S.searching; if(S.searching) S.refocus="q"; render(); return; }
   if(t.dataset.quick!==undefined){ const x=(cfg().quick||[])[+t.dataset.quick]; if(x) openSheet(null, {type:x.type, cat:x.cat, memo:x.memo||"", pay:x.pay||"", toPay:x.toPay||""}); return; }
